@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
+from rmgpy.rmg import output
 import subprocess
+import os
 
 
 class Job(ABC):
@@ -70,3 +72,36 @@ class SlurmJob(Job):
         output = process.stdout.read().decode('utf-8')
         self.job_id = int(output.split()[-1])
         print(output)
+
+
+class SlurmJobFile():
+    """A class for creating SLURM scripts
+    """
+    def __init__(self, full_path=''):
+        self.path = full_path
+        self.settings = {
+            '--job-name': None,
+            '--error': 'error.log',
+            '--output': 'output.log',
+            '--nodes': 1,
+            '--partition': 'west,short',
+            '--exclude': 'c5003',
+            '--mem': '8Gb',
+            '--time': '1:00:00',
+            '--cpus-per-task': 4,
+            '--array': None
+        }
+        self.content = []  # lines of commands to include
+
+    def write_file(self):
+        fdir, fname = os.path.split(self.path)
+        if not os.path.exists(fdir):
+            raise OSError(f"File path does not exist {fdir}")
+        with open(self.path, "w") as writer:
+            writer = open(self.path, "w")
+            writer.write('#!/bin/bash\n')
+            for setting_name in self.settings.keys():
+                if self.settings[setting_name] is not None:
+                    writer.write(f'#SBATCH {setting_name}={self.settings[setting_name]}\n')
+            writer.write('\n\n')
+            writer.writelines(self.content)
