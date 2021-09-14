@@ -3,7 +3,7 @@ from rmgpy.rmg import output
 import subprocess
 import os
 import time
-
+import re
 
 class Job(ABC):
     """A generic job class for submitting compute jobs.
@@ -26,8 +26,10 @@ class SlurmJob(Job):
     def __init__(self):
         self.job_id = 0
         self.status = "NEW"
+        self._last_sacct_lines = []
+        self._array_jobs = []
 
-    def completed(self):
+    def _get_sacct(self):
         if self.job_id == 0:
             raise ValueError("Job has not been submitted!")
         call_sacct = f'sacct -j {self.job_id} --format=JobID,JobName,State'
@@ -41,11 +43,31 @@ class SlurmJob(Job):
             raise ValueError("sacct output does not match expected format")
         if len(lines) == 3:
             raise ValueError(f'No job matching ID {self.job_id}')
+        self._last_sacct_lines = lines        
+
+    def _get_jobs_in_array(self):
+        self._get_sacct()
+        lines = self._last_sacct_lines
+        job_ids = []
+        for i, line in enumerate(lines):
+            if i < 2 or len(line) == 0:
+                continue
+            matches = re.search('[0-9]*_[0-9]{3}', line.split()[0])
+            if matches is not None:
+                job_ids.append(matches.group(0))
+        job_ids = list(set(job_ids))
+        job_ids.sort()
+        if len(job_ids) == 0:
+            raise ValueError(f'Job {self.job_id} is not an array job')
+        self._array_jobs = job_ids
+
+    def completed(self):
+        self._get_sacct()        
 
         # Check the first line for the answer
-        if str(self.job_id) != lines[2].split()[0]:
-            raise ValueError(f'first line does not match job id {self.job_id}')      
-        self.status = lines[2].split()[2]
+        if str(self.job_id) != self._last_sacct_lines[2].split()[0]:
+            raise ValueError(f'first line does not match job id {self.job_id}')
+        self.status = self._last_sacct_lines[2].split()[2]
         if self.status == "COMPLETED":
             return True
         return False
@@ -76,7 +98,7 @@ class SlurmJob(Job):
 
     def wait(self, check_interval=60):
         """waits for the job to complete, checking every check_interval
-        seconds to see if it completed
+        seconds to see if it completed. Does not yet work for arrays
         """
         
         job_done = False
@@ -90,8 +112,34 @@ class SlurmJob(Job):
             # all the others call
             if self.completed():
                 job_done = True
-            elif self.status in ("FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT")
+            elif self.status in ("FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT"):
                 job_done = True
+
+    def wait_all(self, check_interval=60):
+        """waits for all of the jobs in the array to complete,
+        checking every check_interval seconds to see if it completed
+        """
+        
+        job_done = False
+        #while not job_done:
+        #    time.sleep(check_interval)
+        #    
+        #    # TODO fix the logic here- it's not ideal that we rely on
+        #    # completed() to actually check the status and all the others
+
+        self._get_jobs_in_array()
+        for array_id
+        self._get_arr()
+        lines = self._last_sacct_lines
+        job_ids = []
+        for i, line in enumerate(lines):
+            if i < 2 or len(line) == 0:
+                continue
+            matches = re.search('[0-9]*_[0-9]{3}', line.split()[0])
+            if matches is not None:
+                job_ids.append(matches.group(0))
+        job_ids = list(set(job_ids))
+        print(job_ids)
 
 
 class SlurmJobFile():
@@ -125,3 +173,4 @@ class SlurmJobFile():
                     writer.write(f'#SBATCH {setting_name}={self.settings[setting_name]}\n')
             writer.write('\n\n')
             writer.writelines(self.content)
+
