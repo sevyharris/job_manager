@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from rmgpy.rmg import output
 import subprocess
 import os
+import time
 
 
 class Job(ABC):
@@ -72,6 +73,25 @@ class SlurmJob(Job):
         output = process.stdout.read().decode('utf-8')
         self.job_id = int(output.split()[-1])
         print(output)
+
+    def wait(self, check_interval=60):
+        """waits for the job to complete, checking every check_interval
+        seconds to see if it completed
+        """
+        
+        job_done = False
+        while not job_done:
+            time.sleep(check_interval)
+            
+            # TODO fix the logic here- it's not ideal that we rely on
+            # completed() to actually check the status and all the others
+            # just check the object variable that function returned
+            # should create a helper function like check_status() that
+            # all the others call
+            if self.completed():
+                job_done = True
+            elif self.status in ("FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT")
+                job_done = True
 
 
 class SlurmJobFile():
