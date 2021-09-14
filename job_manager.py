@@ -29,10 +29,12 @@ class SlurmJob(Job):
         self._last_sacct_lines = []
         self._array_jobs = []
 
-    def _get_sacct(self):
-        if self.job_id == 0:
+    def _get_sacct(self, job_id=None):
+        if job_id is None:
+            job_id = self.job_id
+        if job_id == 0:
             raise ValueError("Job has not been submitted!")
-        call_sacct = f'sacct -j {self.job_id} --format=JobID,JobName,State'
+        call_sacct = f'sacct -j {job_id} --format=JobID,JobName,State'
         cmd_pieces = call_sacct.split()
         process = subprocess.Popen(cmd_pieces, stdout=subprocess.PIPE)
         output = process.stdout.read().decode('utf-8')
@@ -42,7 +44,7 @@ class SlurmJob(Job):
         if headers[0] != "JobID" or headers[1] != "JobName" or headers[2] != "State":
             raise ValueError("sacct output does not match expected format")
         if len(lines) == 3:
-            raise ValueError(f'No job matching ID {self.job_id}')
+            raise ValueError(f'No job matching ID {job_id}')
         self._last_sacct_lines = lines        
 
     def _get_jobs_in_array(self):
@@ -60,6 +62,15 @@ class SlurmJob(Job):
         if len(job_ids) == 0:
             raise ValueError(f'Job {self.job_id} is not an array job')
         self._array_jobs = job_ids
+
+    def get_status(self, job_id=None):
+        if job_id is None:
+            job_id = self.job_id
+        self._get_sacct(job_id)
+        if str(job_id) != self._last_sacct_lines[2].split()[0]:
+            raise ValueError(f'first line does not match job id {self.job_id}')
+        status = self._last_sacct_lines[2].split()[2]
+        return status
 
     def completed(self):
         self._get_sacct()        
@@ -119,27 +130,15 @@ class SlurmJob(Job):
         """waits for all of the jobs in the array to complete,
         checking every check_interval seconds to see if it completed
         """
-        
-        job_done = False
-        #while not job_done:
-        #    time.sleep(check_interval)
-        #    
-        #    # TODO fix the logic here- it's not ideal that we rely on
-        #    # completed() to actually check the status and all the others
-
         self._get_jobs_in_array()
-        for array_id
-        self._get_arr()
-        lines = self._last_sacct_lines
-        job_ids = []
-        for i, line in enumerate(lines):
-            if i < 2 or len(line) == 0:
-                continue
-            matches = re.search('[0-9]*_[0-9]{3}', line.split()[0])
-            if matches is not None:
-                job_ids.append(matches.group(0))
-        job_ids = list(set(job_ids))
-        print(job_ids)
+        for array_id in self._array_jobs:
+            while True:
+                status = self.get_status(job_id=array_id)
+                if status in ("COMPLETED", "FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT",
+                              "COMPLETED+", "FAILED+", "CANCELLED+", "DEADLINE+", "OUT_OF_MEMORY+", "PREEMPTED+", "TIMEOUT+"):
+                    break
+                else:
+                    time.sleep(check_interval)
 
 
 class SlurmJobFile():
