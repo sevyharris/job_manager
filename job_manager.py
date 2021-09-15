@@ -44,6 +44,7 @@ class SlurmJob(Job):
         if headers[0] != "JobID" or headers[1] != "JobName" or headers[2] != "State":
             raise ValueError("sacct output does not match expected format")
         if len(lines) == 3:
+            print(f'cmd was {cmd_pieces}')
             raise ValueError(f'No job matching ID {job_id}')
         self._last_sacct_lines = lines        
 
@@ -54,7 +55,7 @@ class SlurmJob(Job):
         for i, line in enumerate(lines):
             if i < 2 or len(line) == 0:
                 continue
-            matches = re.search('[0-9]*_[0-9]{3}', line.split()[0])
+            matches = re.search('[0-9]*_[0-9]{1,3}', line.split()[0])
             if matches is not None:
                 job_ids.append(matches.group(0))
         job_ids = list(set(job_ids))
@@ -130,6 +131,8 @@ class SlurmJob(Job):
         """waits for all of the jobs in the array to complete,
         checking every check_interval seconds to see if it completed
         """
+        # need to make sure it's at least running, and this is a terrible hack
+        time.sleep(10)
         self._get_jobs_in_array()
         for array_id in self._array_jobs:
             while True:
