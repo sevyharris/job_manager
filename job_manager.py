@@ -55,7 +55,7 @@ class SlurmJob(Job):
         for i, line in enumerate(lines):
             if i < 2 or len(line) == 0:
                 continue
-            matches = re.search('[0-9]*_[0-9]{1,3}', line.split()[0])
+            matches = re.search('[0-9]*_[0-9]{1,3}$', line.split()[0])
             if matches is not None:
                 job_ids.append(matches.group(0))
         job_ids = list(set(job_ids))
