@@ -77,7 +77,7 @@ class SlurmJob(Job):
         if job_id is None:
             job_id = self.job_id
         self._get_sacct(job_id)
-        if str(job_id) != self._last_sacct_lines[2].split()[0]:
+        if str(job_id) != self._last_sacct_lines[2].split()[0] and str(job_id) not in self._last_sacct_lines[2].split()[0]:
             raise ValueError(f'first line does not match job id {self.job_id}')
         status = self._last_sacct_lines[2].split()[2]
         return status
@@ -86,7 +86,7 @@ class SlurmJob(Job):
         self._get_sacct()        
 
         # Check the first line for the answer
-        if str(self.job_id) != self._last_sacct_lines[2].split()[0]:
+        if str(self.job_id) != self._last_sacct_lines[2].split()[0] and str(job_id) not in self._last_sacct_lines[2].split()[0]:
             raise ValueError(f'first line does not match job id {self.job_id}')
         self.status = self._last_sacct_lines[2].split()[2]
         if self.status == "COMPLETED":
