@@ -48,6 +48,15 @@ class SlurmJob(Job):
             raise ValueError(f'No job matching ID {job_id}')
         self._last_sacct_lines = lines        
 
+    def _check_array_pending(self):
+        self._get_sacct()
+        lines = self._last_sacct_lines
+        new_status = self.get_status()
+        if new_status == 'PENDING':
+            return True
+        return False 
+
+
     def _get_jobs_in_array(self):
         self._get_sacct()
         lines = self._last_sacct_lines
@@ -133,6 +142,12 @@ class SlurmJob(Job):
         """
         # need to make sure it's at least running, and this is a terrible hack
         time.sleep(10)
+        # part of the problem might be that the jobs can take longer than 10 seconds to get running. But they should at least be pending by then
+        
+        # wait for the job to not be pending
+        while self._check_array_pending():
+            time.sleep(10)
+
         self._get_jobs_in_array()
         for array_id in self._array_jobs:
             while True:
