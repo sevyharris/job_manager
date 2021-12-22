@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
-from rmgpy.rmg import output
 import subprocess
 import os
 import time
 import re
+
 
 class Job(ABC):
     """A generic job class for submitting compute jobs.
@@ -18,6 +18,43 @@ class Job(ABC):
     @abstractmethod
     def submit(self, command):
         raise NotImplementedError
+
+
+
+class DefaultJob(Job):
+    """A job class for your local machine if you don't have SLURM
+    """
+    def __init__(self):
+        self.job_id = 0
+        self.status = "NEW"
+        proc = None
+
+    def get_status(self):
+        return self.status
+
+    def completed(self):
+        if self.proc is None:
+            return False
+        poll = self.proc.poll()
+        if poll is None:
+            # p.subprocess is alive
+            return False
+        return True
+
+    def submit(self, command):
+        # submit the process. Don't wait for completion.
+        cmd_pieces = command.split()
+        # process = subprocess.Popen(cmd_pieces, stdout=subprocess.PIPE)
+        # process = subprocess.run(cmd_pieces, stdin=None, stdout=None, stderr=None, close_fds=True)
+        self.proc = subprocess.Popen(cmd_pieces, stdin=None, stdout=None, stderr=None, close_fds=True)
+        print(self.proc)
+
+    def wait(self, check_interval=60):
+        """waits for the job to complete, checking every check_interval
+        seconds to see if it completed. Does not yet work for arrays
+        """
+        while not self.completed():
+            time.sleep(check_interval)
 
 
 class SlurmJob(Job):
@@ -46,7 +83,7 @@ class SlurmJob(Job):
         if len(lines) == 3:
             print(f'cmd was {cmd_pieces}')
             raise ValueError(f'No job matching ID {job_id}')
-        self._last_sacct_lines = lines        
+        self._last_sacct_lines = lines
 
     def _check_array_pending(self):
         self._get_sacct()
@@ -54,8 +91,7 @@ class SlurmJob(Job):
         new_status = self.get_status()
         if new_status == 'PENDING':
             return True
-        return False 
-
+        return False
 
     def _get_jobs_in_array(self):
         self._get_sacct()
@@ -83,10 +119,10 @@ class SlurmJob(Job):
         return status
 
     def completed(self):
-        self._get_sacct()        
+        self._get_sacct()
 
         # Check the first line for the answer
-        if str(self.job_id) != self._last_sacct_lines[2].split()[0] and str(job_id) not in self._last_sacct_lines[2].split()[0]:
+        if str(self.job_id) != self._last_sacct_lines[2].split()[0] and str(self.job_id) not in self._last_sacct_lines[2].split()[0]:
             raise ValueError(f'first line does not match job id {self.job_id}')
         self.status = self._last_sacct_lines[2].split()[2]
         if self.status == "COMPLETED":
@@ -121,11 +157,11 @@ class SlurmJob(Job):
         """waits for the job to complete, checking every check_interval
         seconds to see if it completed. Does not yet work for arrays
         """
-        
+
         job_done = False
         while not job_done:
             time.sleep(check_interval)
-            
+
             # TODO fix the logic here- it's not ideal that we rely on
             # completed() to actually check the status and all the others
             # just check the object variable that function returned
@@ -143,7 +179,7 @@ class SlurmJob(Job):
         # need to make sure it's at least running, and this is a terrible hack
         time.sleep(10)
         # part of the problem might be that the jobs can take longer than 10 seconds to get running. But they should at least be pending by then
-        
+
         # wait for the job to not be pending
         while self._check_array_pending():
             time.sleep(10)
@@ -190,4 +226,3 @@ class SlurmJobFile():
                     writer.write(f'#SBATCH {setting_name}={self.settings[setting_name]}\n')
             writer.write('\n\n')
             writer.writelines(self.content)
-
