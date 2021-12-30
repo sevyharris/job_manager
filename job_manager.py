@@ -20,7 +20,6 @@ class Job(ABC):
         raise NotImplementedError
 
 
-
 class DefaultJob(Job):
     """A job class for your local machine if you don't have SLURM
     """
@@ -224,5 +223,30 @@ class SlurmJobFile():
             for setting_name in self.settings.keys():
                 if self.settings[setting_name] is not None:
                     writer.write(f'#SBATCH {setting_name}={self.settings[setting_name]}\n')
+            writer.write('\n\n')
+            writer.writelines(self.content)
+
+
+class CobaltJobFile():
+    """A class for creating COBALT scripts
+    """
+    def __init__(self, full_path=''):
+        self.path = full_path
+        self.settings = {
+            '-n': 1,
+            '-t': '01:10:20',  # 1 hour, 10 minutes 20 seconds
+        }
+        self.content = []  # lines of commands to include
+
+    def write_file(self):
+        fdir, fname = os.path.split(self.path)
+        if not os.path.exists(fdir):
+            raise OSError(f"File path does not exist {fdir}")
+        with open(self.path, "w") as writer:
+            writer = open(self.path, "w")
+            writer.write('#!/bin/bash\n')
+            for setting_name in self.settings.keys():
+                if self.settings[setting_name] is not None:
+                    writer.write(f'#COBALT {setting_name}={self.settings[setting_name]}\n')
             writer.write('\n\n')
             writer.writelines(self.content)
