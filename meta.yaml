@@ -1,0 +1,14 @@
+package:
+  name: job_manager
+  version: 0.1
+
+build:
+  number: 0
+
+requirements:
+  run:
+    - python
+about:
+  summary: 'A lightweight python package for creating and submitting jobs to a cluster'
+  home: 'https://github.com/sevyharris/job_manager'
+  license: MIT
