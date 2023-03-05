@@ -5,6 +5,33 @@ import time
 import re
 
 
+def get_user():
+    cmd = "whoami"
+    cmd_pieces = cmd.split()
+    proc = subprocess.Popen(cmd_pieces, stdin=None, stdout=subprocess.PIPE, stderr=None, close_fds=True)
+    for line in iter(proc.stdout.readline, ''):
+        text = line.strip().decode('utf-8')
+        if text != '':
+            return text
+
+def count_slurm_jobs(): 
+    user = get_user()
+    cmd = f"squeue -u {user}"
+    cmd_pieces = cmd.split()
+    proc = subprocess.Popen(cmd_pieces, stdin=None, stdout=subprocess.PIPE, stderr=None, close_fds=True)
+    count = 0
+    i = 0
+    for line in iter(proc.stdout.readline, ''):
+        text = line.strip().decode('utf-8')
+        if text != '' and user[:8] in text:
+            # print(text)
+            count += 1
+        i += 1
+        if i > 200:
+            break
+    return count
+
+
 class Job(ABC):
     """A generic job class for submitting compute jobs.
     """
@@ -250,3 +277,4 @@ class CobaltJobFile():
                     writer.write(f'#COBALT {setting_name}={self.settings[setting_name]}\n')
             writer.write('\n\n')
             writer.writelines(self.content)
+
