@@ -107,8 +107,13 @@ class SlurmJob(Job):
         if headers[0] != "JobID" or headers[1] != "JobName" or headers[2] != "State":
             raise ValueError("sacct output does not match expected format")
         if len(lines) == 3:
-            print(f'cmd was {cmd_pieces}')
-            raise ValueError(f'No job matching ID {job_id}')
+            # pretty sure this means the job isn't on the board yet...
+            # wait 2 more seconds and try again
+            time.sleep(2.0)
+            self._get_sacct()
+            if not self._last_sacct_lines:
+                print(f'cmd was {cmd_pieces}')
+                raise ValueError(f'No job matching ID {job_id}')
         self._last_sacct_lines = lines
 
     def _check_array_pending(self):
@@ -176,7 +181,13 @@ class SlurmJob(Job):
         cmd_pieces = command.split()
         process = subprocess.Popen(cmd_pieces, stdout=subprocess.PIPE)
         output = process.stdout.read().decode('utf-8')
-        self.job_id = int(output.split()[-1])
+        try:
+            self.job_id = int(output.split()[-1])
+        except IndexError:
+            # this usually means you have an error in your SLURM script
+            print(f'cmd was {command}')
+            print(output)
+            raise
         print(output)
 
     def wait(self, check_interval=60):
