@@ -5,6 +5,12 @@ import time
 import re
 
 
+END_STATUSES = [
+    "COMPLETED", "FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT",
+    "COMPLETED+", "FAILED+", "CANCELLED+", "DEADLINE+", "OUT_OF_MEMORY+", "PREEMPTED+", "TIMEOUT+",
+]
+
+
 def get_user():
     cmd = "whoami"
     cmd_pieces = cmd.split()
@@ -14,7 +20,8 @@ def get_user():
         if text != '':
             return text
 
-def count_slurm_jobs(): 
+
+def count_slurm_jobs():
     user = get_user()
     cmd = f"squeue -u {user}"
     cmd_pieces = cmd.split()
@@ -149,6 +156,14 @@ class SlurmJob(Job):
         status = self._last_sacct_lines[2].split()[2]
         return status
 
+    def array_done(self):
+        # returns True if all jobs in an array are COMPLETED, FAILED, or CANCELLED
+        self._get_jobs_in_array()
+        for id in self._array_jobs:
+            if self.get_status(job_id=id) not in END_STATUSES:
+                return False
+        return True
+
     def completed(self):
         self._get_sacct()
 
@@ -206,7 +221,7 @@ class SlurmJob(Job):
             # all the others call
             if self.completed():
                 job_done = True
-            elif self.status in ("FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT"):
+            elif self.status in END_STATUSES:
                 job_done = True
 
     def wait_all(self, check_interval=60):
@@ -225,8 +240,7 @@ class SlurmJob(Job):
         for array_id in self._array_jobs:
             while True:
                 status = self.get_status(job_id=array_id)
-                if status in ("COMPLETED", "FAILED", "CANCELLED", "DEADLINE", "OUT_OF_MEMORY", "PREEMPTED", "TIMEOUT",
-                              "COMPLETED+", "FAILED+", "CANCELLED+", "DEADLINE+", "OUT_OF_MEMORY+", "PREEMPTED+", "TIMEOUT+"):
+                if status in END_STATUSES:
                     break
                 else:
                     time.sleep(check_interval)
@@ -288,4 +302,3 @@ class CobaltJobFile():
                     writer.write(f'#COBALT {setting_name}={self.settings[setting_name]}\n')
             writer.write('\n\n')
             writer.writelines(self.content)
-
